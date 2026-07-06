@@ -90,10 +90,10 @@ async def get_company_dataset(
     symbol: str,
     period: str = Query(default="annual", pattern="^(annual|quarter)$"),
     limit: int = Query(default=5, ge=1, le=120),
-    fmp_service: FMPService = Depends(get_fmp_service),
+    stock_data_service: StockDataService = Depends(get_stock_data_service),
 ):
     try:
-        return await fmp_service.get_company_dataset(
+        return await stock_data_service.get_company_dataset(
             symbol=symbol,
             period=period,
             limit=limit,
