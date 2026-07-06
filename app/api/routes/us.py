@@ -10,6 +10,7 @@ from app.services.fmp_service import (
     FMPService,
     FMPServiceError,
 )
+from app.services.market_data_service import StockDataService
 
 router = APIRouter(prefix="/us", tags=["fmp"], dependencies=[Depends(get_current_user)])
 
@@ -23,6 +24,10 @@ def get_fmp_service() -> FMPService:
         timeout_seconds=settings.fmp_timeout_seconds,
         max_retries=settings.fmp_max_retries,
     )
+
+
+def get_stock_data_service(fmp_service: FMPService = Depends(get_fmp_service)) -> StockDataService:
+    return StockDataService(fmp_service=fmp_service)
 
 
 def to_http_error(exc: FMPServiceError) -> HTTPException:
@@ -61,10 +66,10 @@ async def get_stock_list(
 @router.get("/stocks/{symbol}/profile")
 async def get_company_profile(
     symbol: str,
-    fmp_service: FMPService = Depends(get_fmp_service),
+    stock_data_service: StockDataService = Depends(get_stock_data_service),
 ):
     try:
-        return await fmp_service.get_company_profile(symbol)
+        return await stock_data_service.get_profile_with_quote(symbol)
     except FMPServiceError as exc:
         raise to_http_error(exc) from exc
 
@@ -72,10 +77,10 @@ async def get_company_profile(
 @router.get("/stocks/{symbol}/quote")
 async def get_quote(
     symbol: str,
-    fmp_service: FMPService = Depends(get_fmp_service),
+    stock_data_service: StockDataService = Depends(get_stock_data_service),
 ):
     try:
-        return await fmp_service.get_quote(symbol)
+        return await stock_data_service.get_quote_only(symbol)
     except FMPServiceError as exc:
         raise to_http_error(exc) from exc
 

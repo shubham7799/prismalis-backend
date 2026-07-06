@@ -3,3 +3,5 @@ uvicorn
 python-dotenv
 httpx
 asyncpg
+sqlalchemy>=2.0
+greenlet
