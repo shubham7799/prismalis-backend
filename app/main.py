@@ -6,10 +6,12 @@ from app.api.routes.watchlist import router as watchlist_router
 from app.core.config import get_settings
 from app.core.database import close_db_pool, init_db
 from app.core.orm import create_orm_tables, dispose_engine
+from app.core.tracking import RequestTrackingMiddleware
 
 settings = get_settings()
 
 app = FastAPI(title=settings.app_name)
+app.add_middleware(RequestTrackingMiddleware)
 
 
 @app.on_event("startup")

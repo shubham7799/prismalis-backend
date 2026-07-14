@@ -64,3 +64,26 @@ async def init_db() -> None:
         await connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)"
         )
+        await connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS request_logs (
+                id          TEXT PRIMARY KEY,
+                timestamp   TIMESTAMPTZ NOT NULL,
+                method      TEXT NOT NULL,
+                path        TEXT NOT NULL,
+                query       TEXT,
+                status_code INTEGER,
+                duration_ms DOUBLE PRECISION,
+                user_id     TEXT,
+                ip          TEXT,
+                user_agent  TEXT,
+                error       TEXT
+            )
+            """
+        )
+        await connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_request_logs_timestamp ON request_logs(timestamp)"
+        )
+        await connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_request_logs_user_id ON request_logs(user_id)"
+        )
