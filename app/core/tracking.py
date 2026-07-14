@@ -5,8 +5,9 @@ from datetime import datetime, timezone
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from app.core.database import get_pool
+from app.core.orm import get_session
 from app.core.security import decode_access_token
+from app.models.request_log import RequestLog
 
 
 class RequestTrackingMiddleware(BaseHTTPMiddleware):
@@ -23,29 +24,24 @@ class RequestTrackingMiddleware(BaseHTTPMiddleware):
             raise
         finally:
             duration_ms = (time.perf_counter() - start) * 1000
-            user_id = _extract_user_id(request)
 
             try:
-                pool = await get_pool()
-                await pool.execute(
-                    """
-                    INSERT INTO request_logs
-                        (id, timestamp, method, path, query, status_code,
-                         duration_ms, user_id, ip, user_agent, error)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                    """,
-                    str(uuid.uuid4()),
-                    datetime.now(timezone.utc),
-                    request.method,
-                    request.url.path,
-                    request.url.query or None,
-                    status_code,
-                    round(duration_ms, 2),
-                    user_id,
-                    _client_ip(request),
-                    request.headers.get("user-agent"),
-                    error_msg,
+                log = RequestLog(
+                    id=str(uuid.uuid4()),
+                    timestamp=datetime.now(timezone.utc),
+                    method=request.method,
+                    path=request.url.path,
+                    query=request.url.query or None,
+                    status_code=status_code,
+                    duration_ms=round(duration_ms, 2),
+                    user_id=_extract_user_id(request),
+                    ip=_client_ip(request),
+                    user_agent=request.headers.get("user-agent"),
+                    error=error_msg,
                 )
+                async with get_session() as session:
+                    session.add(log)
+                    await session.commit()
             except Exception:
                 pass
 

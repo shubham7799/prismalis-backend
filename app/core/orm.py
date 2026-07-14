@@ -36,6 +36,12 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 async def create_orm_tables() -> None:
+    # Import all models here so their tables are registered with Base.metadata
+    import app.models.users  # noqa: F401
+    import app.models.request_log  # noqa: F401
+    import app.models.market_data  # noqa: F401
+    import app.models.watchlist  # noqa: F401
+
     async with get_engine().begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
 

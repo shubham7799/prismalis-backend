@@ -4,7 +4,6 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.us import router as us_router
 from app.api.routes.watchlist import router as watchlist_router
 from app.core.config import get_settings
-from app.core.database import close_db_pool, init_db
 from app.core.orm import create_orm_tables, dispose_engine
 from app.core.tracking import RequestTrackingMiddleware
 
@@ -16,13 +15,11 @@ app.add_middleware(RequestTrackingMiddleware)
 
 @app.on_event("startup")
 async def startup():
-    await init_db()
     await create_orm_tables()
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    await close_db_pool()
     await dispose_engine()
 
 
