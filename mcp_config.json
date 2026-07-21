@@ -1,0 +1,22 @@
+{
+  "_readme": [
+    "Copy the 'prismalis' block into your Claude Desktop config at:",
+    "  macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json",
+    "  Windows: %APPDATA%\\Claude\\claude_desktop_config.json",
+    "",
+    "Set SCRIPT_PATH to the absolute path of mcp_server.py on your machine.",
+    "All other config (DB URL, API keys, etc.) is read from the project's .env — no duplication needed.",
+    "",
+    "Optional: set PRISMALIS_USER_ID if you want get_watchlist to work without",
+    "passing user_id explicitly. Find your UUID in the users table."
+  ],
+  "mcpServers": {
+    "prismalis": {
+      "command": "python",
+      "args": ["D:\\Projects\\prismalis-backend\\mcp_server.py"],
+      "env": {
+        "PRISMALIS_USER_ID": "<optional-user-uuid>"
+      }
+    }
+  }
+}

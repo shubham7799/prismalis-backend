@@ -5,3 +5,4 @@ httpx
 asyncpg
 sqlalchemy>=2.0
 greenlet
+mcp>=1.0
