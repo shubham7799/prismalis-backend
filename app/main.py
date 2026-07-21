@@ -10,7 +10,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.us import router as us_router
 from app.api.routes.watchlist import router as watchlist_router
 from app.core.config import get_settings
-from app.core.orm import create_orm_tables, dispose_engine, ping_db
+from app.core.orm import create_orm_tables, dispose_engine
 from app.core.tracking import RequestTrackingMiddleware
 
 settings = get_settings()
@@ -48,7 +48,6 @@ def read_root():
 
 @app.get("/health")
 async def health_check():
-    await ping_db()
     return {"status": "ok"}
 
 
