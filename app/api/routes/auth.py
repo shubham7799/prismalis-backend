@@ -43,11 +43,11 @@ async def get_current_user(
         )
 
     return {
-        "id": user["id"],
-        "email": user["email"],
-        "full_name": user["full_name"],
-        "avatar_url": user["avatar_url"],
-        "auth_provider": user["auth_provider"],
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "avatar_url": user.avatar_url,
+        "auth_provider": user.auth_provider,
     }
 
 

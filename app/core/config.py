@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     jwt_issuer: str = "prismalis-backend"
     access_token_expire_minutes: int = 1440
 
-    # Google OAuth (optional)
+    # Google (Gemini AI chat + OAuth)
+    google_api_key: str = ""
     google_client_id: str = ""
 
     @field_validator("jwt_secret_key")
