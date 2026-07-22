@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.auth import router as auth_router
 from app.api.routes.us import router as us_router
 from app.api.routes.assistant import router as assistant_router
+from app.api.routes.screener import router as screener_router
 from app.api.routes.watchlist import router as watchlist_router
 from app.core.config import get_settings
 from app.core.orm import create_orm_tables, dispose_engine
@@ -56,5 +57,6 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(us_router, prefix="/api")
 app.include_router(watchlist_router, prefix="/api")
 app.include_router(assistant_router, prefix="/api")
+app.include_router(screener_router, prefix="/api")
 
 app.mount("/mcp", mcp.streamable_http_app())

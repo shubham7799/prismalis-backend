@@ -74,7 +74,90 @@ async def price_history(symbol: str, days: int = 365) -> str:
         return f"Error fetching price history: {e}"
 
 
-TOOLS = [stock_quote, company_profile, company_financials, price_history]
+@tool
+async def screen_stocks(
+    sector: str | None = None,
+    industry: str | None = None,
+    market_cap_min: float | None = None,
+    market_cap_max: float | None = None,
+    pe_min: float | None = None,
+    pe_max: float | None = None,
+    price_min: float | None = None,
+    price_max: float | None = None,
+    beta_max: float | None = None,
+    dividend_min: float | None = None,
+    revenue_growth_min: float | None = None,
+    limit: int = 20,
+) -> str:
+    """Screen and filter stocks by fundamental and market criteria.
+
+    Args:
+        sector: e.g. 'Technology', 'Healthcare', 'Energy', 'Financials', 'Consumer Cyclical'
+        industry: e.g. 'Semiconductors', 'Software', 'Banks'
+        market_cap_min: Minimum market cap in USD (e.g. 10000000000 for $10B)
+        market_cap_max: Maximum market cap in USD
+        pe_min: Minimum P/E ratio
+        pe_max: Maximum P/E ratio (e.g. 25 to find value stocks)
+        price_min: Minimum stock price in USD
+        price_max: Maximum stock price in USD
+        beta_max: Maximum beta (e.g. 1.0 for low-volatility stocks)
+        dividend_min: Minimum dividend yield as percentage (e.g. 2.0 for 2%+)
+        revenue_growth_min: Minimum annual revenue growth as decimal (e.g. 0.15 for 15%+).
+                            Applied as a post-filter since FMP does not support it natively.
+        limit: Max results to return (default 20, max 50)
+    """
+    limit = max(1, min(50, limit))
+    fetch_limit = min(limit * 5, 100) if revenue_growth_min is not None else limit
+
+    try:
+        results = await fmp().screen_stocks(
+            market_cap_min=market_cap_min,
+            market_cap_max=market_cap_max,
+            pe_min=pe_min,
+            pe_max=pe_max,
+            price_min=price_min,
+            price_max=price_max,
+            beta_max=beta_max,
+            dividend_min=dividend_min,
+            sector=sector,
+            industry=industry,
+            limit=fetch_limit,
+        )
+    except FMPServiceError as e:
+        return f"Error running screener: {e}"
+
+    if not results:
+        return "No stocks matched the given criteria."
+
+    if revenue_growth_min is not None:
+        filtered = []
+        for stock in results:
+            growth = stock.get("revenueGrowth") or stock.get("revenue_growth")
+            if growth is not None and growth >= revenue_growth_min:
+                filtered.append(stock)
+        results = filtered[:limit]
+        if not results:
+            return "No stocks matched after applying revenue growth filter."
+
+    output = []
+    for s in results:
+        output.append({
+            "symbol": s.get("symbol"),
+            "name": s.get("companyName"),
+            "sector": s.get("sector"),
+            "industry": s.get("industry"),
+            "price": s.get("price"),
+            "marketCap": s.get("marketCap"),
+            "pe": s.get("pe"),
+            "beta": s.get("beta"),
+            "dividendYield": s.get("lastAnnualDividend"),
+            "exchange": s.get("exchangeShortName"),
+        })
+
+    return json.dumps(output, default=str, indent=2)
+
+
+TOOLS = [stock_quote, company_profile, company_financials, price_history, screen_stocks]
 
 
 async def generate_title(first_message: str) -> str:

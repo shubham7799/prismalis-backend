@@ -187,6 +187,46 @@ class FMPService:
             params={"symbol": symbol.upper(), "period": period, "limit": limit},
         )
 
+    async def screen_stocks(
+        self,
+        market_cap_min: Optional[float] = None,
+        market_cap_max: Optional[float] = None,
+        pe_min: Optional[float] = None,
+        pe_max: Optional[float] = None,
+        price_min: Optional[float] = None,
+        price_max: Optional[float] = None,
+        beta_min: Optional[float] = None,
+        beta_max: Optional[float] = None,
+        volume_min: Optional[float] = None,
+        dividend_min: Optional[float] = None,
+        sector: Optional[str] = None,
+        industry: Optional[str] = None,
+        exchange: Optional[str] = None,
+        country: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[JsonObject]:
+        return await self.fetch(
+            "stock-screener",
+            api_version="v3",
+            params={
+                "marketCapMoreThan": market_cap_min,
+                "marketCapLowerThan": market_cap_max,
+                "peMoreThan": pe_min,
+                "peLowerThan": pe_max,
+                "priceMoreThan": price_min,
+                "priceLowerThan": price_max,
+                "betaMoreThan": beta_min,
+                "betaLowerThan": beta_max,
+                "volumeMoreThan": volume_min,
+                "dividendMoreThan": dividend_min,
+                "sector": sector,
+                "industry": industry,
+                "exchange": exchange,
+                "country": country,
+                "limit": limit,
+            },
+        )
+
     async def get_historical_prices(
         self,
         symbol: str,
