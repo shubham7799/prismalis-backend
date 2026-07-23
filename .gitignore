@@ -1,3 +1,4 @@
 .env
 auth.db
 __pycache__
+.dockerignore
