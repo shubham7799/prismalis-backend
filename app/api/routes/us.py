@@ -2,7 +2,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.routes.auth import get_current_user
 from app.core.config import get_settings
 from app.services.fmp_service import (
     FMPConfigurationError,
@@ -12,7 +11,7 @@ from app.services.fmp_service import (
 )
 from app.services.market_data_service import StockDataService
 
-router = APIRouter(prefix="/us", tags=["fmp"], dependencies=[Depends(get_current_user)])
+router = APIRouter(prefix="/us", tags=["fmp"])
 
 
 def get_fmp_service() -> FMPService:
