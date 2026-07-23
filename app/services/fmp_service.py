@@ -16,6 +16,12 @@ class FMPConfigurationError(FMPServiceError):
     """Raised when required FMP configuration is missing."""
 
 
+class FMPRateLimitError(FMPServiceError):
+    """Raised when FMP returns 429. Not retried — retrying a rate limit only makes it worse."""
+
+    status_code = 429
+
+
 class FMPRequestError(FMPServiceError):
     """Raised when FMP returns an error response or invalid payload."""
 
@@ -66,7 +72,12 @@ class FMPService:
                 async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
                     response = await client.get(url, params=request_params)
 
-                if response.status_code == 429 or 500 <= response.status_code < 600:
+                if response.status_code == 429:
+                    raise FMPRateLimitError(
+                        "FMP rate limit exceeded. Please try again shortly.",
+                    )
+
+                if 500 <= response.status_code < 600:
                     response.raise_for_status()
 
                 if response.status_code >= 400:
@@ -79,6 +90,8 @@ class FMPService:
                     return response.json()
                 except ValueError as exc:
                     raise FMPRequestError("FMP returned a non-JSON response.") from exc
+            except FMPRateLimitError:
+                raise
             except (httpx.HTTPError, FMPRequestError) as exc:
                 last_error = exc
                 if attempt >= self.max_retries:

@@ -631,7 +631,14 @@ class MarketDataService:
         if len(rows) >= limit and not any(is_stale(getattr(r, spec.freshness_column), spec.ttl) for r in rows):
             return [_to_api_dict(r, spec) for r in rows]
 
-        payload = await fetch()
+        try:
+            payload = await fetch()
+        except Exception:
+            if rows:
+                # FMP is unavailable/rate-limited — serve whatever is in the DB, even if stale.
+                return [_to_api_dict(r, spec) for r in rows]
+            raise
+
         await self._upsert_many(spec, payload)
 
         rows = await self._get_rows(spec, symbol, limit, period)

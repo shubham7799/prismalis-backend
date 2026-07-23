@@ -8,7 +8,7 @@ from langchain_core.tools import tool
 
 from app.core.config import get_settings
 from app.mcp.services import fmp, stock_service
-from app.services.fmp_service import FMPServiceError
+from app.services.fmp_service import FMPRateLimitError, FMPServiceError
 
 SYSTEM_PROMPT = (
     "You are a financial research assistant for Prismalis, a stock analysis platform. "
@@ -19,12 +19,20 @@ SYSTEM_PROMPT = (
 )
 
 
+RATE_LIMIT_MESSAGE = (
+    "The stock data provider is currently rate-limited. Do not retry this tool again in this turn — "
+    "tell the user the data is temporarily unavailable and to try again in a minute."
+)
+
+
 @tool
 async def stock_quote(symbol: str) -> str:
     """Get the live price quote for a US stock ticker (price, change, volume, market cap, moving averages)."""
     try:
         data = await stock_service().get_quote_only(symbol.upper())
         return json.dumps(data, default=str, indent=2)
+    except FMPRateLimitError:
+        return RATE_LIMIT_MESSAGE
     except FMPServiceError as e:
         return f"Error fetching quote: {e}"
 
@@ -35,6 +43,8 @@ async def company_profile(symbol: str) -> str:
     try:
         data = await stock_service().get_profile_with_quote(symbol.upper())
         return json.dumps(data, default=str, indent=2)
+    except FMPRateLimitError:
+        return RATE_LIMIT_MESSAGE
     except FMPServiceError as e:
         return f"Error fetching profile: {e}"
 
@@ -54,6 +64,8 @@ async def company_financials(symbol: str, period: str = "annual", limit: int = 5
     try:
         data = await stock_service().get_company_dataset(symbol.upper(), period=period, limit=limit)
         return json.dumps(data, default=str, indent=2)
+    except FMPRateLimitError:
+        return RATE_LIMIT_MESSAGE
     except FMPServiceError as e:
         return f"Error fetching financials: {e}"
 
@@ -70,6 +82,8 @@ async def price_history(symbol: str, days: int = 365) -> str:
     try:
         data = await fmp().get_historical_prices(symbol.upper(), timeseries=days)
         return json.dumps(data, default=str, indent=2)
+    except FMPRateLimitError:
+        return RATE_LIMIT_MESSAGE
     except FMPServiceError as e:
         return f"Error fetching price history: {e}"
 
@@ -123,6 +137,8 @@ async def screen_stocks(
             industry=industry,
             limit=fetch_limit,
         )
+    except FMPRateLimitError:
+        return RATE_LIMIT_MESSAGE
     except FMPServiceError as e:
         return f"Error running screener: {e}"
 

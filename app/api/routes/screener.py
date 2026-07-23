@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.api.routes.auth import get_current_user
 from app.mcp.services import fmp
-from app.services.fmp_service import FMPServiceError
+from app.services.fmp_service import FMPRateLimitError, FMPServiceError
 
 router = APIRouter(prefix="/screener", tags=["screener"])
 
@@ -58,6 +58,8 @@ async def screen_stocks(
             country=body.country,
             limit=fetch_limit,
         )
+    except FMPRateLimitError as e:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(e))
     except FMPServiceError as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
 
