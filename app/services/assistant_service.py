@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import AsyncIterator
 
@@ -15,7 +16,9 @@ SYSTEM_PROMPT = (
     "You have access to real-time stock data tools. Use them to answer user questions about "
     "stocks, companies, financials, and market data. Be concise, accurate, and cite the data "
     "you retrieve. When discussing financials, highlight key metrics like revenue growth, "
-    "margins, and valuation."
+    "margins, and valuation. When the user asks to compare two or more stocks, use the "
+    "compare_stocks tool instead of calling individual quote/financials tools per symbol, "
+    "and present the comparison as a clear table or side-by-side summary."
 )
 
 
@@ -173,7 +176,68 @@ async def screen_stocks(
     return json.dumps(output, default=str, indent=2)
 
 
-TOOLS = [stock_quote, company_profile, company_financials, price_history, screen_stocks]
+@tool
+async def compare_stocks(symbols: list[str], period: str = "annual") -> str:
+    """Compare 2-4 stocks side by side on price, valuation, profitability, and growth metrics.
+
+    Args:
+        symbols: List of 2-4 ticker symbols to compare, e.g. ["AAPL", "MSFT", "GOOGL"]
+        period: 'annual' or 'quarter' for financial metrics
+    """
+    if period not in ("annual", "quarter"):
+        return "Invalid period. Use 'annual' or 'quarter'."
+    if len(symbols) < 2:
+        return "Provide at least 2 symbols to compare."
+    if len(symbols) > 4:
+        return "Compare at most 4 symbols at a time for a readable result."
+
+    symbols = [s.upper() for s in symbols]
+    svc = stock_service()
+
+    async def _one(symbol: str) -> dict:
+        try:
+            dataset = await svc.get_company_dataset(symbol, period=period, limit=1)
+        except FMPRateLimitError:
+            return {"symbol": symbol, "error": "rate_limited"}
+        except FMPServiceError as e:
+            return {"symbol": symbol, "error": str(e)}
+
+        profile = dataset.get("profile") or {}
+        quote = dataset.get("quote") or {}
+        ratios = (dataset.get("ratios") or [{}])[0]
+        growth = (dataset.get("financial_growth") or [{}])[0]
+        key_metrics = (dataset.get("key_metrics") or [{}])[0]
+
+        return {
+            "symbol": symbol,
+            "name": profile.get("companyName") or profile.get("company_name"),
+            "sector": profile.get("sector"),
+            "industry": profile.get("industry"),
+            "price": quote.get("price"),
+            "marketCap": quote.get("marketCap") or quote.get("market_cap"),
+            "peRatio": ratios.get("priceToEarningsRatio") or ratios.get("price_to_earnings_ratio"),
+            "priceToSales": ratios.get("priceToSalesRatio") or ratios.get("price_to_sales_ratio"),
+            "priceToBook": ratios.get("priceToBookRatio") or ratios.get("price_to_book_ratio"),
+            "grossMargin": ratios.get("grossProfitMargin") or ratios.get("gross_profit_margin"),
+            "netMargin": ratios.get("netProfitMargin") or ratios.get("net_profit_margin"),
+            "returnOnEquity": key_metrics.get("returnOnEquity") or key_metrics.get("return_on_equity"),
+            "revenueGrowth": growth.get("revenueGrowth") or growth.get("revenue_growth"),
+            "netIncomeGrowth": growth.get("netIncomeGrowth") or growth.get("net_income_growth"),
+            "debtToEquity": ratios.get("debtToEquityRatio") or ratios.get("debt_to_equity_ratio"),
+            "dividendYield": ratios.get("dividendYieldPercentage") or ratios.get("dividend_yield_percentage"),
+        }
+
+    results = await asyncio.gather(*(_one(s) for s in symbols))
+
+    if all("error" in r for r in results):
+        if any(r["error"] == "rate_limited" for r in results):
+            return RATE_LIMIT_MESSAGE
+        return "Could not fetch data for any of the requested symbols."
+
+    return json.dumps(list(results), default=str, indent=2)
+
+
+TOOLS = [stock_quote, company_profile, company_financials, price_history, screen_stocks, compare_stocks]
 
 
 async def generate_title(first_message: str) -> str:
