@@ -11,14 +11,20 @@ from app.services.chat_service import ChatService
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 
+SSE_HEADERS = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
 
 def get_chat_service() -> ChatService:
     return ChatService()
 
 
 def _sse_event(payload: dict) -> str:
-    """Serialize a payload as a single NDJSON line for streaming responses."""
-    return json.dumps(payload, default=str) + "\n"
+    """Serialize a payload as a Server-Sent Event."""
+    return f"data: {json.dumps(payload, default=str)}\n\n"
 
 
 # ---------- schemas ----------
@@ -123,42 +129,60 @@ async def start_chat(
     chat_type = "stock" if body.symbol else "general"
 
     if body.stream:
-        title, chat_session = await _create_chat_with_title(
-            body.message, current_user["id"], svc, chat_type, body.symbol
-        )
-        chat_id = chat_session["id"]
-        user_msg = await svc.add_message(chat_id=chat_id, role="user", content=body.message)
-
-        async def token_stream():
-            yield _sse_event({
-                "type": "start",
-                "chat": chat_session,
-                "user_message": user_msg,
-            })
-
-            collected = []
-            action_box: dict = {}
+        async def generate_status_stream():
             try:
-                async for token in stream_chat(body.message, history=None, symbol=body.symbol, action_box=action_box):
-                    collected.append(token)
-                    yield _sse_event({"type": "token", "content": token})
-            except Exception as e:
-                yield _sse_event({"type": "error", "detail": str(e)})
-                return
+                yield _sse_event({"status": "started", "message": "Starting a new chat..."})
+                await asyncio.sleep(0.1)
 
-            assistant_msg = await svc.add_message(
-                chat_id=chat_id, role="assistant", content="".join(collected)
-            )
-            yield _sse_event({
-                "type": "done",
-                "assistant_message": assistant_msg,
-                "action": action_box or None,
-            })
+                yield _sse_event({"status": "thinking", "message": "Setting up the conversation...", "progress": 15})
+                title, chat_session = await _create_chat_with_title(
+                    body.message, current_user["id"], svc, chat_type, body.symbol
+                )
+                chat_id = chat_session["id"]
+                user_msg = await svc.add_message(chat_id=chat_id, role="user", content=body.message)
+
+                yield _sse_event({
+                    "status": "thinking",
+                    "message": "Assistant is thinking...",
+                    "progress": 35,
+                    "chat": chat_session,
+                    "user_message": user_msg,
+                })
+
+                collected = []
+                action_box: dict = {}
+                first_token = True
+                async for token in stream_chat(
+                    body.message, history=None, symbol=body.symbol, action_box=action_box
+                ):
+                    if first_token:
+                        yield _sse_event({"status": "streaming", "message": "Generating response...", "progress": 60})
+                        first_token = False
+                    collected.append(token)
+                    yield _sse_event({"status": "streaming", "content": token})
+
+                assistant_msg = await svc.add_message(
+                    chat_id=chat_id, role="assistant", content="".join(collected)
+                )
+
+                yield _sse_event({"status": "complete", "message": "Response complete!", "progress": 100})
+
+                yield _sse_event({
+                    "status": "done",
+                    "data": {
+                        "chat": chat_session,
+                        "user_message": user_msg,
+                        "assistant_message": assistant_msg,
+                        "action": action_box or None,
+                    },
+                })
+            except Exception as e:
+                yield _sse_event({"status": "error", "message": str(e)})
 
         return StreamingResponse(
-            token_stream(),
-            media_type="application/x-ndjson",
-            headers={"X-Chat-Id": chat_id, "X-Chat-Title": title},
+            generate_status_stream(),
+            media_type="text/event-stream",
+            headers=SSE_HEADERS,
         )
 
     title, result = await asyncio.gather(
@@ -211,35 +235,59 @@ async def send_message(
 
     symbol = chat_session.get("symbol")
 
+    if body.stream:
+        async def generate_status_stream():
+            try:
+                yield _sse_event({"status": "started", "message": "Sending your message..."})
+                await asyncio.sleep(0.1)
+
+                history_rows = await svc.get_messages(chat_id=chat_id)
+                history = [{"role": m["role"], "content": m["content"]} for m in history_rows]
+                user_msg = await svc.add_message(chat_id=chat_id, role="user", content=body.message)
+
+                yield _sse_event({
+                    "status": "thinking",
+                    "message": "Assistant is thinking...",
+                    "progress": 35,
+                    "user_message": user_msg,
+                })
+
+                collected = []
+                action_box: dict = {}
+                first_token = True
+                async for token in stream_chat(body.message, history, symbol=symbol, action_box=action_box):
+                    if first_token:
+                        yield _sse_event({"status": "streaming", "message": "Generating response...", "progress": 60})
+                        first_token = False
+                    collected.append(token)
+                    yield _sse_event({"status": "streaming", "content": token})
+
+                assistant_msg = await svc.add_message(
+                    chat_id=chat_id, role="assistant", content="".join(collected)
+                )
+
+                yield _sse_event({"status": "complete", "message": "Response complete!", "progress": 100})
+
+                yield _sse_event({
+                    "status": "done",
+                    "data": {
+                        "user_message": user_msg,
+                        "assistant_message": assistant_msg,
+                        "action": action_box or None,
+                    },
+                })
+            except Exception as e:
+                yield _sse_event({"status": "error", "message": str(e)})
+
+        return StreamingResponse(
+            generate_status_stream(),
+            media_type="text/event-stream",
+            headers=SSE_HEADERS,
+        )
+
     history_rows = await svc.get_messages(chat_id=chat_id)
     history = [{"role": m["role"], "content": m["content"]} for m in history_rows]
-
     user_msg = await svc.add_message(chat_id=chat_id, role="user", content=body.message)
-
-    if body.stream:
-        async def token_stream():
-            yield _sse_event({"type": "start", "user_message": user_msg})
-
-            collected = []
-            action_box: dict = {}
-            try:
-                async for token in stream_chat(body.message, history, symbol=symbol, action_box=action_box):
-                    collected.append(token)
-                    yield _sse_event({"type": "token", "content": token})
-            except Exception as e:
-                yield _sse_event({"type": "error", "detail": str(e)})
-                return
-
-            assistant_msg = await svc.add_message(
-                chat_id=chat_id, role="assistant", content="".join(collected)
-            )
-            yield _sse_event({
-                "type": "done",
-                "assistant_message": assistant_msg,
-                "action": action_box or None,
-            })
-
-        return StreamingResponse(token_stream(), media_type="application/x-ndjson")
 
     try:
         result = await assistant_chat(body.message, history, symbol=symbol)
