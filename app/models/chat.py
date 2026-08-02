@@ -14,6 +14,8 @@ class Chat(Base):
     id: Mapped[str] = mapped_column(Text, primary_key=True)
     user_id: Mapped[str] = mapped_column(Text, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[Optional[str]] = mapped_column(Text)
+    type: Mapped[str] = mapped_column(Text, nullable=False, server_default="general", index=True)
+    symbol: Mapped[Optional[str]] = mapped_column(Text)  # set when type == "stock"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 

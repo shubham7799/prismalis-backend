@@ -8,8 +8,20 @@ from app.models.chat import Chat, ChatMessage
 
 
 class ChatService:
-    async def create_chat(self, user_id: str, title: str | None = None) -> dict:
-        chat = Chat(id=str(uuid.uuid4()), user_id=user_id, title=title)
+    async def create_chat(
+        self,
+        user_id: str,
+        title: str | None = None,
+        type: str = "general",
+        symbol: str | None = None,
+    ) -> dict:
+        chat = Chat(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            title=title,
+            type=type,
+            symbol=symbol.upper() if symbol else None,
+        )
         async with get_session() as session:
             session.add(chat)
             await session.commit()
@@ -75,6 +87,8 @@ class ChatService:
             "id": c.id,
             "user_id": c.user_id,
             "title": c.title,
+            "type": c.type,
+            "symbol": c.symbol,
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "updated_at": c.updated_at.isoformat() if c.updated_at else None,
         }
