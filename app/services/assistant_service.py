@@ -231,8 +231,9 @@ async def compare_stocks(symbols: list[str], period: str = "annual") -> str:
         except FMPServiceError as e:
             return {"symbol": symbol, "error": str(e)}
 
-        profile = dataset.get("profile") or {}
-        quote = dataset.get("quote") or {}
+        # get_company_dataset returns each section as a list of rows
+        profile = (dataset.get("profile") or [{}])[0]
+        quote = (dataset.get("quote") or [{}])[0]
         ratios = (dataset.get("ratios") or [{}])[0]
         growth = (dataset.get("financial_growth") or [{}])[0]
         key_metrics = (dataset.get("key_metrics") or [{}])[0]
