@@ -5,7 +5,7 @@ httpx
 asyncpg
 sqlalchemy>=2.0
 greenlet
-mcp>=1.0
+mcp>=2.2
 langchain>=0.3
 langchain-google-genai>=2.0
 langchain-core>=0.3

@@ -1,12 +1,14 @@
 from contextlib import asynccontextmanager
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from app.core.orm import create_orm_tables, dispose_engine
 
 
 @asynccontextmanager
-async def lifespan(server: FastMCP):
+async def lifespan(server: MCPServer):
+    # Runs for the stdio entrypoint (mcp_server.py) and, when the HTTP app is
+    # mounted, via StreamableHTTPSessionManager.run() from the FastAPI lifespan.
     await create_orm_tables()
     try:
         yield
@@ -14,7 +16,7 @@ async def lifespan(server: FastMCP):
         await dispose_engine()
 
 
-mcp = FastMCP(
+mcp = MCPServer(
     name="prismalis",
     instructions=(
         "Stock research tools powered by Prismalis. "
